@@ -930,105 +930,64 @@
         
         // Monthly report functions
         function loadMonthlyReport() {
-            const year = parseInt(document.getElementById('reportYear').value);
+            const monthYear = document.getElementById('reportMonth').value;
+            if (!monthYear) return;
             
-            // Get all months with data for the selected year
-            const monthsWithData = [...new Set(
-                expenses
-                    .filter(expense => new Date(expense.date).getFullYear() === year)
-                    .map(expense => new Date(expense.date).getMonth())
-            )].sort();
+            const [year, month] = monthYear.split('-').map(Number);
             
-            // If no data for selected year, show message
-            if (monthsWithData.length === 0) {
-                const tbody = document.querySelector('#monthlyReportTable tbody');
-                tbody.innerHTML = '<tr><td colspan="13" style="text-align: center;">No data available for selected year</td></tr>';
-                return;
-            }
-            
-            // Prepare table header with month names
-            const thead = document.querySelector('#monthlyReportTable thead');
-            thead.innerHTML = '<tr><th>Category</th>';
-            
-            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-            
-            for (let month = 0; month < 12; month++) {
-                thead.innerHTML += `<th>${monthNames[month]}</th>`;
-            }
-            thead.innerHTML += '</tr>';
-            
-            // Calculate totals for each category by month
-            const categoryMonthlyTotals = {};
-            
-            categories.forEach(category => {
-                categoryMonthlyTotals[category.id] = Array(12).fill(0);
-            });
-            
-            // Add uncategorized bucket
-            categoryMonthlyTotals['uncategorized'] = Array(12).fill(0);
-            
-            // Process expenses
-            expenses.forEach(expense => {
+            // Filter expenses for selected month
+            const monthExpenses = expenses.filter(expense => {
                 const expenseDate = new Date(expense.date);
-                if (expenseDate.getFullYear() === year) {
-                    const month = expenseDate.getMonth();
-                    const categoryId = expense.categoryId || 'uncategorized';
-                    
-                    if (!categoryMonthlyTotals[categoryId]) {
-                        categoryMonthlyTotals[categoryId] = Array(12).fill(0);
-                    }
-                    
-                    categoryMonthlyTotals[categoryId][month] += expense.amount;
-                }
+                return expenseDate.getMonth() === month - 1 && 
+                       expenseDate.getFullYear() === year;
             });
             
-            // Prepare table rows
+            // Group by category
+            const categoryTotals = {};
+            monthExpenses.forEach(expense => {
+                const categoryId = expense.categoryId;
+                if (!categoryTotals[categoryId]) {
+                    categoryTotals[categoryId] = 0;
+                }
+                categoryTotals[categoryId] += expense.amount;
+            });
+            
+            // Prepare data for table
+            const reportData = [];
+            for (const categoryId in categoryTotals) {
+                const category = categories.find(c => c.id == categoryId);
+                const categoryName = category ? category.name : 'Uncategorized';
+                reportData.push({
+                    categoryName: categoryName,
+                    total: categoryTotals[categoryId]
+                });
+            }
+            
+            // Sort by total (descending)
+            reportData.sort((a, b) => b.total - a.total);
+            
+            // Update report table
             const tbody = document.querySelector('#monthlyReportTable tbody');
             tbody.innerHTML = '';
             
-            // Add rows for each category
-            categories.forEach(category => {
+            let grandTotal = 0;
+            reportData.forEach(item => {
                 const row = document.createElement('tr');
-                row.innerHTML = `<td>${category.name}</td>`;
-                
-                for (let month = 0; month < 12; month++) {
-                    const amount = categoryMonthlyTotals[category.id][month];
-                    row.innerHTML += `<td>${amount > 0 ? '$' + amount.toFixed(2) : '-'}</td>`;
-                }
-                
+                row.innerHTML = `
+                    <td>${item.categoryName}</td>
+                    <td>$${item.total.toFixed(2)}</td>
+                `;
                 tbody.appendChild(row);
+                grandTotal += item.total;
             });
             
-            // Add uncategorized row if there are any
-            const uncategorizedTotal = categoryMonthlyTotals['uncategorized'].reduce((a, b) => a + b, 0);
-            if (uncategorizedTotal > 0) {
-                const row = document.createElement('tr');
-                row.innerHTML = `<td>Uncategorized</td>`;
-                
-                for (let month = 0; month < 12; month++) {
-                    const amount = categoryMonthlyTotals['uncategorized'][month];
-                    row.innerHTML += `<td>${amount > 0 ? '$' + amount.toFixed(2) : '-'}</td>`;
-                }
-                
-                tbody.appendChild(row);
-            }
-            
-            // Add total row
+            // Add grand total row
             const totalRow = document.createElement('tr');
             totalRow.style.fontWeight = 'bold';
-            totalRow.innerHTML = '<td>Total</td>';
-            
-            // Calculate monthly totals
-            const monthlyTotals = Array(12).fill(0);
-            for (let month = 0; month < 12; month++) {
-                let monthTotal = 0;
-                for (const categoryId in categoryMonthlyTotals) {
-                    monthTotal += categoryMonthlyTotals[categoryId][month];
-                }
-                monthlyTotals[month] = monthTotal;
-                totalRow.innerHTML += `<td>${monthTotal > 0 ? '$' + monthTotal.toFixed(2) : '-'}</td>`;
-            }
-            
+            totalRow.innerHTML = `
+                <td>Total</td>
+                <td>$${grandTotal.toFixed(2)}</td>
+            `;
             tbody.appendChild(totalRow);
         }
         
