@@ -993,6 +993,14 @@
         
         // Data management functions
         function exportData() {
+            // First ensure we have the latest data by saving to storage
+            saveExpensesToStorage();
+            saveCategoriesToStorage();
+            
+            // Then reload to ensure we're working with current data
+            loadExpenses();
+            loadCategories();
+            
             // Create CSV content
             const csvContent = [];
             
